@@ -1,0 +1,15 @@
+[package]
+name = "example-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.5"
+ppenc = {path = "../"}
+idcurl = "0.4.2"
+hmac-sha512 = "1.1.1"
+md5 = "0.7.0"
+hmac-sha256 = "1.1.3"
+hex = "0.4.3"

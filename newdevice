@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import sys
+import hmac
+import json as js
+from os import urandom, environ
+from functools import partial
+from hashlib import md5, sha256, sha512
+
+eprint = partial(print, file=sys.stderr)
+
+try:
+    from requests import post
+except ImportError:
+    eprint("requests module not found")
+    sys.exit(1)
+
+
+def monster_mac(val):
+    mac_url = environ.get("MONSTERMAC_URL",
+                          "http://localhost:8081")
+
+    res = post(mac_url, data=val)
+    assert res.status_code == 200, "monster mac did not return 200 OK"
+    return MonsterMac(val, res.content)
+
+
+class MonsterMac:
+    def __init__(self, name, monster_mac):
+        self.name = name
+        self.monster_mac = monster_mac
+
+    @property
+    def device_id(self):
+        hash1 = sha512(self.monster_mac).digest()
+        return md5(hash1).digest().hex()
+
+    @property
+    def token_mac(self):
+        hasher = hmac.new(self.monster_mac, self.name, digestmod=sha256)
+        return md5(hasher.digest()).digest().hex()
+
+    @property
+    def device_salt(self):
+        return sha256(sha256(self.monster_mac).digest()).digest().hex()
+
+    @property
+    def device_token(self):
+        return f"00.{self.name.hex()}.{self.token_mac}"
+
+
+def main():
+    name = urandom(32)
+    mac = monster_mac(name)
+    device_salt = bytes.fromhex(mac.device_salt)
+    device_data = {
+        "deviceId": mac.device_id,
+        "headerKeySalt": list(device_salt[:16]),
+        "bodyKeySalt": list(device_salt[16:]),
+        "senderRngKey": list(urandom(32)),
+        "deviceToken": mac.device_token,
+    }
+
+    with open("devicedata.json", 'w') as file:
+        js.dump(device_data, file)
+
+    for k, v in device_data.items():
+        print(k, v)
+    print("written devicedata.json")
+
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        eprint(f"application crashed {exc}")
+        sys.exit(1)
